@@ -48,6 +48,12 @@ namespace MultiPresence.Presence
         private const uint DeathCountOffset = 0x90;
         private const uint NewGamePlusOffset = 0x70;
 
+        /// <summary>
+        /// Upper bound used to reject a pointer chain that resolved to nonsense. Max vitality in
+        /// Sekiro is a few hundred even after upgrades, so anything past this is a bad read.
+        /// </summary>
+        private const int MaximumReasonableVitality = 100000;
+
         private static DiscordRpcClient discord;
         private static DiscordStatusUpdater updater;
 
@@ -193,14 +199,18 @@ namespace MultiPresence.Presence
             try
             {
                 var address = scanned.Field(chain, field);
-                if (address != 0 && (address & 0xFFFF) < 0x1000)
+                var value = Hypervisor.Read<int>(address, true);
+
+                // If the chain resolved at all the address is already readable, so the only
+                // useful check is on the value: max vitality has to look like a real number.
+                if (value > 0 && value < MaximumReasonableVitality)
                 {
                     return scanned;
                 }
 
                 AppLog.Warning(
-                    $"The Sekiro signature resolved to {scanned.Address:X} but reading it returned " +
-                    $"{address:X}; falling back to the static 1.06 address.");
+                    $"The Sekiro signature resolved to {scanned.Address:X} but it read {value} at " +
+                    $"{address:X}, which is not a sane value; falling back to the static 1.06 address.");
             }
             catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
             {
