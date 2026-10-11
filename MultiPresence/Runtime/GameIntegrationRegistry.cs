@@ -7,6 +7,7 @@ internal static class GameIntegrationRegistry
     private static readonly IReadOnlyDictionary<string, Func<Task>> Integrations =
         new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnoreCase)
         {
+            ["Bloodborne"] = Sync(BB.DoAction),
             ["Borderlands 1"] = Sync(BL1.DoAction),
             ["Borderlands 2"] = Sync(BL2.DoAction),
             ["Call of Duty®"] = COD.DoAction,

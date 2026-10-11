@@ -1,0 +1,19 @@
+{
+    "AppId": "0000000000000000000",
+    "Games": {
+        "Bloodborne": {
+            "Default": {
+                "Details": "Bloodborne",
+                "State": "{state}",
+                "LargeAsset": "logo",
+                "SmallAsset": "",
+                "LargeAssetText": "Bloodborne",
+                "SmallAssetText": "",
+                "Button1Text": "",
+                "Button1URL": "",
+                "Button2Text": "",
+                "Button2URL": ""
+            }
+        }
+    }
+}
