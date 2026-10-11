@@ -97,7 +97,10 @@ namespace MultiPresence.Presence
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
                 {
-                    AppLog.Warning("Could not read the Sekiro presence values.", exception);
+                    // The pointers are resolved and verified once, so this only runs if the game
+                    // changed state underneath us. Fall back to the menu quietly, like the other
+                    // presence readers do.
+                    _ = exception;
                     ShowMainMenu();
                 }
             }
@@ -156,8 +159,10 @@ namespace MultiPresence.Presence
         }
 
         /// <summary>
-        /// Scans for the two global pointers once per session. The scan walks every readable
-        /// region of sekiro.exe, so it must never run inside the polling loop.
+        /// Scans for the two global pointers once per session and verifies each one before
+        /// accepting it. The scan walks every readable region of sekiro.exe, so it must never
+        /// run inside the polling loop, and a bad chain must be rejected here rather than
+        /// throwing on every poll.
         /// </summary>
         private static void ResolvePointers()
         {
@@ -166,16 +171,50 @@ namespace MultiPresence.Presence
                 return;
             }
 
-            worldChrMan = PointerBase.Resolve(
+            var worldChrManStatic = new PointerBase(WorldChrManRva, false);
+            var worldChrManScanned = PointerBase.Resolve(
                 WorldChrManSignature,
                 WorldChrManInstructionOffset,
                 WorldChrManRva);
-            gameData = PointerBase.Resolve(
+
+            var gameDataStatic = new PointerBase(GameDataRva, false);
+            var gameDataScanned = PointerBase.Resolve(
                 GameDataSignature,
                 GameDataInstructionOffset,
                 GameDataRva);
+
+            worldChrMan = Verify(worldChrManScanned, worldChrManStatic, PlayerVitalsChain, MaxVitalityOffset);
+            gameData = Verify(gameDataScanned, gameDataStatic, DeathCountOffset);
             pointersResolved = true;
         }
+
+        private static PointerBase Verify(PointerBase scanned, PointerBase fallback, uint[] chain, uint field)
+        {
+            try
+            {
+                var address = scanned.Field(chain, field);
+                if (address != 0 && (address & 0xFFFF) < 0x1000)
+                {
+                    return scanned;
+                }
+
+                AppLog.Warning(
+                    $"The Sekiro signature resolved to {scanned.Address:X} but reading it returned " +
+                    $"{address:X}; falling back to the static 1.06 address.");
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+            {
+                AppLog.Warning(
+                    "The Sekiro signature resolved but the pointer chain could not be read; " +
+                    "falling back to the static 1.06 address.",
+                    exception);
+            }
+
+            return fallback;
+        }
+
+        private static PointerBase Verify(PointerBase scanned, PointerBase fallback, uint field) =>
+            Verify(scanned, fallback, [], field);
 
         private static string ResolveApplicationId()
         {
