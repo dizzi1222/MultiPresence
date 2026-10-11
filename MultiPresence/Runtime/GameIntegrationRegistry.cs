@@ -77,6 +77,7 @@ internal static class GameIntegrationRegistry
             ["Resident Evil 8"] = Sync(RE8.DoAction),
             ["Resident Evil Revelations 2"] = Sync(REV2.DoAction),
             ["Scott Pilgrim vs The World"] = Sync(SPTG.DoAction),
+            ["Sekiro"] = Sync(SKR.DoAction),
             ["Shin Megami Tensei III"] = Sync(SMT3.DoAction),
             ["Shin Megami Tensei V"] = Sync(SMT5.DoAction),
             ["Sonic Adventure 2"] = Sync(SA2.DoAction),

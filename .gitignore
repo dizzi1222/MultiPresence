@@ -273,3 +273,5 @@ __pycache__/
 
 .obj/
 .bin/
+# Local publish output (see build-and-deploy.ps1)
+/dist/

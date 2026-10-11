@@ -72,6 +72,7 @@ public static partial class GameDetector
         ("sonic2app", "Sonic Adventure 2"),
         ("Sonic Adventure DX", "Sonic Adventure DX"),
         ("SONIC_GENERATIONS", "Sonic Generations"),
+        ("sekiro", "Sekiro"),
         ("SB-Win64-Shipping", "Stellar Blade"),
         ("TemtemSwarm", "Temtem: Swarm"),
         ("isaac-ng", "The Binding of Isaac: Rebirth"),

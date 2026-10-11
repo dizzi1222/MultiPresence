@@ -18,6 +18,10 @@
     <Deterministic>true</Deterministic>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- The presence readers are all declared 'async' because PlaceholderHelper takes a
+         Func<Task<...>>, but most of them do not await anything. Silencing just this warning
+         keeps every other warning an error. -->
+    <NoWarn>$(NoWarn);CS1998</NoWarn>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
   </PropertyGroup>
