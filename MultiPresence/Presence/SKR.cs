@@ -14,6 +14,12 @@ namespace MultiPresence.Presence
         private const string GameTitle = "Sekiro: Shadows Die Twice";
 
         /// <summary>
+        /// Key of the artwork uploaded to the Discord application. It has to match "LargeAsset"
+        /// in Assets/config/Sekiro.json, because the main menu presence is built in code.
+        /// </summary>
+        private const string LogoAssetKey = "2675238895_logo";
+
+        /// <summary>
         /// Sekiro has no Discord application of its own. Until one is created, this borrows the
         /// Sonic Adventure 2 application that already ships with MultiPresence so the presence
         /// shows up immediately; only the artwork is wrong. Put a real id in the "AppId" field of
@@ -187,7 +193,7 @@ namespace MultiPresence.Presence
                 State = "",
                 Assets = new Assets()
                 {
-                    LargeImageKey = "logo",
+                    LargeImageKey = LogoAssetKey,
                     LargeImageText = GameTitle
                 },
                 Timestamps = PlaceholderHelper._startTimestamp

@@ -20,6 +20,12 @@ namespace MultiPresence.Presence
         private const string GameTitle = "Bloodborne";
 
         /// <summary>
+        /// Key of the artwork uploaded to the Discord application. It has to match "LargeAsset"
+        /// in Assets/config/Bloodborne.json, because the launcher presence is built in code.
+        /// </summary>
+        private const string LogoAssetKey = "3629414379_logo";
+
+        /// <summary>
         /// bbport maps the PlayStation 4 address space into the host by adding this bias to every
         /// guest offset, so guest offset 0 is committed at 0x1_0000_0000.
         /// </summary>
@@ -135,7 +141,7 @@ namespace MultiPresence.Presence
                 State = "At Launcher",
                 Assets = new Assets()
                 {
-                    LargeImageKey = "logo",
+                    LargeImageKey = LogoAssetKey,
                     LargeImageText = GameTitle
                 },
                 Timestamps = PlaceholderHelper._startTimestamp

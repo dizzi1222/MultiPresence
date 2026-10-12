@@ -1,11 +1,11 @@
 ﻿{
-    "AppId": "982562008228560986",
+    "AppId": "1559032648435761204",
     "Games": {
         "Sekiro": {
             "Default": {
                 "Details": "Lv. {level} - {sen} Sen",
                 "State": "HP {hp}/{maxhp} - Posture {posture}/{maxposture}",
-                "LargeAsset": "logo",
+                "LargeAsset": "2675238895_logo",
                 "SmallAsset": "",
                 "LargeAssetText": "Sekiro: Shadows Die Twice",
                 "SmallAssetText": "",

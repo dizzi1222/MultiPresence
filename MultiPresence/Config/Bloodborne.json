@@ -1,11 +1,11 @@
 ﻿{
-    "AppId": "982562008228560986",
+    "AppId": "1559032305669115985",
     "Games": {
         "Bloodborne": {
             "Default": {
                 "Details": "Bloodborne",
                 "State": "{state}",
-                "LargeAsset": "logo",
+                "LargeAsset": "3629414379_logo",
                 "SmallAsset": "",
                 "LargeAssetText": "Bloodborne",
                 "SmallAssetText": "",
