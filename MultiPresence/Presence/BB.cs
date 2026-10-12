@@ -25,7 +25,13 @@ namespace MultiPresence.Presence
         /// </summary>
         private const ulong GuestMemoryBias = 0x1_0000_0000;
 
-        private const string FallbackApplicationId = "0000000000000000000";
+        /// <summary>
+        /// Bloodborne has no Discord application of its own. Until one is created, this borrows
+        /// the Sonic Adventure 2 application that already ships with MultiPresence so the
+        /// presence shows up immediately; only the artwork is wrong. Put a real id in the
+        /// "AppId" field of Assets/config/Bloodborne.json to replace it.
+        /// </summary>
+        private const string FallbackApplicationId = "982562008228560986";
 
         private static DiscordRpcClient discord;
         private static DiscordStatusUpdater updater;
