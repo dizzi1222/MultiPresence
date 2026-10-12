@@ -48,15 +48,17 @@ foreach ($game in $Games) {
         Copy-Item -LiteralPath $path -Destination $backup
     }
 
-    $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($json.PSObject.Properties.Name -contains 'AppId') {
-        $json.AppId = $AppId
+    # Se reemplaza solo la linea del AppId en vez de reserializar el archivo entero, para no
+    # reformatear los placeholders que el usuario edita a mano.
+    $raw = Get-Content -LiteralPath $path -Raw
+
+    if ($raw -match '"AppId"\s*:\s*"[^"]*"') {
+        $raw = [regex]::Replace($raw, '"AppId"\s*:\s*"[^"]*"', ('"AppId": "' + $AppId + '"'), 1)
     } else {
-        # Add-Member sobre un PSCustomObject devuelve el objeto, hay que reasignar.
-        $json | Add-Member -NotePropertyName 'AppId' -NotePropertyValue $AppId -Force
+        $raw = [regex]::Replace($raw, '(\s*\{)', "`$1`n  `"AppId`": `"$AppId`",", 1)
     }
 
-    $json | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding UTF8
+    Set-Content -LiteralPath $path -Value $raw -Encoding UTF8 -NoNewline
 
     Write-Host "$game.json -> AppId $AppId" -ForegroundColor Green
 }
