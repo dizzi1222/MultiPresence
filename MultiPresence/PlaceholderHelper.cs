@@ -34,21 +34,7 @@ public static class PlaceholderHelper
             {
                 Details = Limit(updater.UpdateDetails(gameName, placeholders, state), 128),
                 State = Limit(updater.UpdateState(gameName, placeholders, state), 128),
-                Assets = new Assets
-                {
-                    LargeImageKey = EmptyToNull(Limit(
-                        updater.UpdateLargeAsset(gameName, placeholders, state),
-                        256)),
-                    LargeImageText = EmptyToNull(Limit(
-                        updater.UpdateLargeAssetText(gameName, placeholders, state),
-                        128)),
-                    SmallImageKey = EmptyToNull(Limit(
-                        updater.UpdateSmallAsset(gameName, placeholders, state),
-                        256)),
-                    SmallImageText = EmptyToNull(Limit(
-                        updater.UpdateSmallAssetText(gameName, placeholders, state),
-                        128))
-                },
+                Assets = CreateAssets(updater, gameName, placeholders, state),
                 Timestamps = _startTimestamp,
                 Buttons = buttons.Length == 0 ? null : buttons
             });
@@ -58,6 +44,26 @@ public static class PlaceholderHelper
             AppLog.Warning($"Could not publish Discord presence for '{gameName}'.", exception);
         }
     }
+
+    public static Assets CreateAssets(
+        DiscordStatusUpdater updater,
+        string gameName,
+        Dictionary<string, object> placeholders,
+        string state = "Default") => new()
+    {
+        LargeImageKey = EmptyToNull(Limit(
+            updater.UpdateLargeAsset(gameName, placeholders, state),
+            256)),
+        LargeImageText = EmptyToNull(Limit(
+            updater.UpdateLargeAssetText(gameName, placeholders, state),
+            128)),
+        SmallImageKey = EmptyToNull(Limit(
+            updater.UpdateSmallAsset(gameName, placeholders, state),
+            256)),
+        SmallImageText = EmptyToNull(Limit(
+            updater.UpdateSmallAssetText(gameName, placeholders, state),
+            128))
+    };
 
     private static DiscordRPC.Button[] CreateButtons(
         DiscordStatusUpdater updater,

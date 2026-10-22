@@ -5,10 +5,10 @@
             "Default": {
                 "Details": "Bloodborne",
                 "State": "{state}",
-                "LargeAsset": "3629414379_logo",
-                "SmallAsset": "",
+                "LargeAsset": "https://cdn2.steamgriddb.com/grid/dee4ed4d1e8d368ec034d1800085cd6d.png",
+                "SmallAsset": "https://cdn2.steamgriddb.com/icon/a512a13cba4f6c460635abf0b029fd63.png",
                 "LargeAssetText": "Bloodborne",
-                "SmallAssetText": "",
+                "SmallAssetText": "Bloodborne",
                 "Button1Text": "",
                 "Button1URL": "",
                 "Button2Text": "",

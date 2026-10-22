@@ -11,13 +11,6 @@ namespace MultiPresence.Presence
     {
         private const string ProcessName = "sekiro";
         private const string ConfigPath = "Assets/config/Sekiro.json";
-        private const string GameTitle = "Sekiro: Shadows Die Twice";
-
-        /// <summary>
-        /// Key of the artwork uploaded to the Discord application. It has to match "LargeAsset"
-        /// in Assets/config/Sekiro.json, because the main menu presence is built in code.
-        /// </summary>
-        private const string LogoAssetKey = "2675238895_logo";
 
         /// <summary>
         /// Sekiro has no Discord application of its own. Until one is created, this borrows the
@@ -191,11 +184,7 @@ namespace MultiPresence.Presence
             {
                 Details = "In Main Menu",
                 State = "",
-                Assets = new Assets()
-                {
-                    LargeImageKey = LogoAssetKey,
-                    LargeImageText = GameTitle
-                },
+                Assets = PlaceholderHelper.CreateAssets(updater, "Sekiro", new Dictionary<string, object>()),
                 Timestamps = PlaceholderHelper._startTimestamp
             });
         }

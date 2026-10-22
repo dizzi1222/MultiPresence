@@ -1,0 +1,55 @@
+{
+  "retrieved": "2026-10-22",
+  "provider": "SteamGridDB",
+  "transformations": "None. Native square originals downloaded without resizing, cropping or re-encoding.",
+  "assets": [
+    {
+      "game": "Bloodborne",
+      "role": "LargeAsset",
+      "file": "Bloodborne/cover.png",
+      "sourcePage": "https://www.steamgriddb.com/grid/137883",
+      "sourceUrl": "https://cdn2.steamgriddb.com/grid/dee4ed4d1e8d368ec034d1800085cd6d.png",
+      "author": "RealZombro",
+      "width": 1024,
+      "height": 1024,
+      "mime": "image/png",
+      "sha256": "4d5d5346bf000e277bbc43662e74b1dddd4888d472aea41ddafbf6a14c9f9e7c"
+    },
+    {
+      "game": "Bloodborne",
+      "role": "SmallAsset",
+      "file": "Bloodborne/icon.png",
+      "sourcePage": "https://www.steamgriddb.com/icon/66152",
+      "sourceUrl": "https://cdn2.steamgriddb.com/icon/a512a13cba4f6c460635abf0b029fd63.png",
+      "author": "Sertall",
+      "width": 512,
+      "height": 512,
+      "mime": "image/png",
+      "sha256": "c9047d2fc10e3d15e0447d316d92b257c0cb35d1fcfbf8e1ea338ff1a8456045"
+    },
+    {
+      "game": "Sekiro: Shadows Die Twice",
+      "role": "LargeAsset",
+      "file": "Sekiro/cover.jpg",
+      "sourcePage": "https://www.steamgriddb.com/grid/164683",
+      "sourceUrl": "https://cdn2.steamgriddb.com/grid/4969b1e15f10ba795f135dfe3d8107fe.jpg",
+      "author": "Comcord",
+      "width": 1024,
+      "height": 1024,
+      "mime": "image/jpeg",
+      "sha256": "3ca53e230ee98fe3083947cc9f1464767b4d4a750b482a6429930727155b8866"
+    },
+    {
+      "game": "Sekiro: Shadows Die Twice",
+      "role": "SmallAsset",
+      "file": "Sekiro/icon.png",
+      "sourcePage": "https://www.steamgriddb.com/icon/33748",
+      "sourceUrl": "https://cdn2.steamgriddb.com/icon/74349b2e19170fe0bbb4feb6f5720c5a.png",
+      "author": "vruhed",
+      "width": 512,
+      "height": 512,
+      "mime": "image/png",
+      "sha256": "0cd45de23172590be993019de71abd54e90122f68044de6ef98fe4b656307573"
+    }
+  ]
+}

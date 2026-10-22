@@ -17,13 +17,6 @@ namespace MultiPresence.Presence
     {
         private const string ProcessName = "bb-probe";
         private const string ConfigPath = "Assets/config/Bloodborne.json";
-        private const string GameTitle = "Bloodborne";
-
-        /// <summary>
-        /// Key of the artwork uploaded to the Discord application. It has to match "LargeAsset"
-        /// in Assets/config/Bloodborne.json, because the launcher presence is built in code.
-        /// </summary>
-        private const string LogoAssetKey = "3629414379_logo";
 
         /// <summary>
         /// bbport maps the PlayStation 4 address space into the host by adding this bias to every
@@ -139,11 +132,7 @@ namespace MultiPresence.Presence
             {
                 Details = "Bloodborne",
                 State = "At Launcher",
-                Assets = new Assets()
-                {
-                    LargeImageKey = LogoAssetKey,
-                    LargeImageText = GameTitle
-                },
+                Assets = PlaceholderHelper.CreateAssets(updater, "Bloodborne", new Dictionary<string, object>()),
                 Timestamps = PlaceholderHelper._startTimestamp
             });
         }

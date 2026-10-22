@@ -42,6 +42,12 @@ foreach ($file in Get-ChildItem -LiteralPath $srcConfig -Filter *.json) {
 }
 Write-Host "    $copied presence config(s) copied" -ForegroundColor DarkGray
 
+# Ship the original artwork and its source credits alongside the URL-based templates.
+$srcArtwork = Join-Path $staging 'Assets\Artwork'
+$dstArtwork = Join-Path $Target 'Assets\Artwork'
+New-Item -ItemType Directory -Force -Path $dstArtwork | Out-Null
+Get-ChildItem -LiteralPath $srcArtwork | Copy-Item -Destination $dstArtwork -Recurse -Force
+
 # The executable. MultiPresenceGame.exe, steam_api64.dll and blacklist.txt are signed release
 # files, so they are left untouched; MultiPresence.exe must be closed before this runs.
 $dstExe = Join-Path $Target 'MultiPresence.exe'
@@ -56,4 +62,4 @@ $actual = (Get-FileHash -LiteralPath $dstExe -Algorithm SHA256).Hash
 if ($expected -ne $actual) { throw 'The deployed executable does not match the build.' }
 
 Write-Host '==> Done.' $dstExe 'deployed and hash verified.' -ForegroundColor Green
-Write-Host '    Remember to set "AppId" in Assets\config\Sekiro.json for the Sekiro presence.' -ForegroundColor Yellow
+Write-Host '    Bloodborne and Sekiro use SteamGridDB artwork URLs; local originals are in Assets\Artwork.' -ForegroundColor DarkGray

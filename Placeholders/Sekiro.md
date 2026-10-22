@@ -12,20 +12,18 @@
 |{deaths}|Shows your death counter|
 |{clearcount}|Shows your NG+ counter|
 
-# Pre-made icons for Large-/Smallasset
-**Do not use them with {}**
+# Artwork and Discord application id
+The shipped configuration keeps its existing Discord application ID and uses a
+1024x1024 SteamGridDB cover plus a 512x512 icon through direct HTTPS URLs.
+The same artwork is used in the main menu and in game. No artwork upload or API
+key is required. See [artwork sources and local originals](../MultiPresence/Artwork/README.md).
 
-logo = Game logo
+Edit `LargeAsset`, `SmallAsset` and their text fields in `Assets/config/Sekiro.json`
+(next to `MultiPresence.exe`). Image and text changes reload automatically.
+Leave `SmallAsset` empty to hide the corner icon. Uploaded Discord artwork keys
+are also supported; do not wrap keys or URLs in `{}`.
 
-# Discord application id
-Sekiro has no official Discord application, so this build needs one of your own:
-
-1. Go to https://discord.com/developers/applications and click *Create Application*.
-2. Name it, then open *Rich Presence → Artwork* and upload a 512x512 image named `logo`.
-3. Copy the *Application ID* from *General Information*.
-4. Paste it into the `"AppId"` field of `Assets/config/Sekiro.json` (inside the `MultiPresence`
-   folder, next to `MultiPresence.exe`).
-
-The file is reloaded automatically while MultiPresence runs, so you do not have to recompile.
+If you use your own Discord application, change `AppId` and start a new presence
+session so the client reconnects with that ID. No rebuild is needed.
 `"Details"` and `"State"` above are only the defaults; edit them freely, the placeholders are
 replaced every few seconds.

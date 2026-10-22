@@ -5,10 +5,10 @@
             "Default": {
                 "Details": "Lv. {level} - {sen} Sen",
                 "State": "HP {hp}/{maxhp} - Posture {posture}/{maxposture}",
-                "LargeAsset": "2675238895_logo",
-                "SmallAsset": "",
+                "LargeAsset": "https://cdn2.steamgriddb.com/grid/4969b1e15f10ba795f135dfe3d8107fe.jpg",
+                "SmallAsset": "https://cdn2.steamgriddb.com/icon/74349b2e19170fe0bbb4feb6f5720c5a.png",
                 "LargeAssetText": "Sekiro: Shadows Die Twice",
-                "SmallAssetText": "",
+                "SmallAssetText": "Sekiro: Shadows Die Twice",
                 "Button1Text": "",
                 "Button1URL": "",
                 "Button2Text": "",

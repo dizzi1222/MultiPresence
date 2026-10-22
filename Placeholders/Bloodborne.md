@@ -23,12 +23,16 @@ Once health is located the placeholders below become available. They are declare
 |{hp}|Shows your current vitality|
 |{maxhp}|Shows your maximum vitality|
 
-# Discord application id
-Bloodborne has no official Discord application:
+# Artwork and Discord application id
+The shipped configuration keeps its existing Discord application ID and uses a
+1024x1024 SteamGridDB cover plus a 512x512 icon through direct HTTPS URLs.
+The same artwork is used at the launcher and in game. No artwork upload or API
+key is required. See [artwork sources and local originals](../MultiPresence/Artwork/README.md).
 
-1. Go to https://discord.com/developers/applications and click *Create Application*.
-2. Name it, then open *Rich Presence → Artwork* and upload a 512x512 image named `logo`.
-3. Copy the *Application ID* from *General Information*.
-4. Paste it into the `"AppId"` field of `Assets/config/Bloodborne.json`.
+Edit `LargeAsset`, `SmallAsset` and their text fields in
+`Assets/config/Bloodborne.json`. Image and text changes reload automatically.
+Leave `SmallAsset` empty to hide the corner icon. Uploaded Discord artwork keys
+are also supported; do not wrap keys or URLs in `{}`.
 
-The file is reloaded automatically, so no rebuild is needed.
+If you use your own Discord application, change `AppId` and start a new presence
+session so the client reconnects with that ID. No rebuild is needed.
