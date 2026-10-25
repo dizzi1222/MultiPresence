@@ -1,7 +1,7 @@
 <#
     Builds MultiPresence in Release and deploys it to an existing install folder.
 
-    .\build-and-deploy.ps1
+    .\build-and-deploy.ps1 # deploys to the installation opened by the desktop shortcut
     .\build-and-deploy.ps1 -Target "G:\Mi unidad\Mi unidad\[Herramientas]\MultiPresence - Discord Presence ... (WindowsOnly)"
 
     Requires the .NET 9 SDK. It is normally already installed; if "dotnet" is not on PATH
@@ -9,11 +9,34 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Target = 'G:\Mi unidad\Mi unidad\[Herramientas]\MultiPresence - Discord Presence para multilpes juegos; DMC, Dark souls, Resident etc (WindowsOnly)'
+    [string]$Target
 )
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+
+if (-not $Target) {
+    $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'MultiPresence - Acceso directo.lnk'
+    if (-not (Test-Path -LiteralPath $shortcutPath)) {
+        throw "Desktop shortcut not found: $shortcutPath. Pass -Target to select an install folder."
+    }
+
+    $shell = New-Object -ComObject WScript.Shell
+    $installExe = $shell.CreateShortcut($shortcutPath).TargetPath
+    if (-not $installExe -or -not (Test-Path -LiteralPath $installExe)) {
+        throw "The desktop shortcut does not point to an existing MultiPresence.exe: $installExe"
+    }
+
+    $Target = Split-Path -Path $installExe -Parent
+}
+
+if (-not (Test-Path -LiteralPath $Target -PathType Container)) {
+    throw "The target folder does not exist: $Target"
+}
+
+if (Get-Process -Name 'MultiPresence' -ErrorAction SilentlyContinue) {
+    throw 'MultiPresence is still running. Close the tray icon first.'
+}
 
 $dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
 if (-not $dotnet) { $dotnet = 'C:\Program Files\dotnet\dotnet.exe' }
@@ -29,7 +52,6 @@ $exe = Join-Path $staging 'MultiPresence.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw "The publish did not produce $exe" }
 
 Write-Host '==> Deploying to' $Target -ForegroundColor Cyan
-if (-not (Test-Path -LiteralPath $Target)) { throw "The target folder does not exist: $Target" }
 
 # Presence templates. Copy them one by one so a renamed config never drags the whole folder over.
 $srcConfig = Join-Path $staging 'Assets\Config'
@@ -51,9 +73,6 @@ Get-ChildItem -LiteralPath $srcArtwork | Copy-Item -Destination $dstArtwork -Rec
 # The executable. MultiPresenceGame.exe, steam_api64.dll and blacklist.txt are signed release
 # files, so they are left untouched; MultiPresence.exe must be closed before this runs.
 $dstExe = Join-Path $Target 'MultiPresence.exe'
-if (Get-Process -Name 'MultiPresence' -ErrorAction SilentlyContinue) {
-    throw 'MultiPresence is still running. Close the tray icon first.'
-}
 Remove-Item -LiteralPath $dstExe -Force
 Copy-Item -LiteralPath $exe -Destination $dstExe -Force
 
