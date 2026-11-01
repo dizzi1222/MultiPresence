@@ -1,84 +1,124 @@
 <#
-    Builds MultiPresence in Release and deploys it to an existing install folder.
-
-    .\build-and-deploy.ps1 # deploys to the installation opened by the desktop shortcut
-    .\build-and-deploy.ps1 -Target "G:\Mi unidad\Mi unidad\[Herramientas]\MultiPresence - Discord Presence ... (WindowsOnly)"
-
-    Requires the .NET 9 SDK. It is normally already installed; if "dotnet" is not on PATH
-    the script falls back to C:\Program Files\dotnet\dotnet.exe.
+Builds the fork and updater, backs up an existing installation, and deploys it.
+Existing JSON configurations are preserved; missing templates are added.
+Without -Target, uses the desktop MultiPresence shortcut. Requires .NET 9 SDK.
 #>
 [CmdletBinding()]
-param(
-    [string]$Target
-)
+param([string]$Target)
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-
 if (-not $Target) {
-    $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'MultiPresence - Acceso directo.lnk'
-    if (-not (Test-Path -LiteralPath $shortcutPath)) {
-        throw "Desktop shortcut not found: $shortcutPath. Pass -Target to select an install folder."
-    }
-
+    $shortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'MultiPresence - Acceso directo.lnk'
+    if (-not (Test-Path -LiteralPath $shortcut)) { throw 'Desktop shortcut not found. Pass -Target.' }
     $shell = New-Object -ComObject WScript.Shell
-    $installExe = $shell.CreateShortcut($shortcutPath).TargetPath
-    if (-not $installExe -or -not (Test-Path -LiteralPath $installExe)) {
-        throw "The desktop shortcut does not point to an existing MultiPresence.exe: $installExe"
+    $Target = Split-Path -Path $shell.CreateShortcut($shortcut).TargetPath -Parent
+}
+$Target = (Resolve-Path -LiteralPath $Target).ProviderPath
+$targetExe = Join-Path $Target 'MultiPresence.exe'
+if (-not (Test-Path -LiteralPath $targetExe -PathType Leaf)) {
+    throw "Not an existing MultiPresence installation: $Target"
+}
+
+function Assert-InstallationStopped {
+    foreach ($process in Get-Process -Name MultiPresence,Updater -ErrorAction SilentlyContinue) {
+        if ($process.Path -and (Split-Path -Path $process.Path -Parent) -eq $Target) {
+            throw "Close $($process.ProcessName) in $Target before deploying."
+        }
     }
+}
+Assert-InstallationStopped
 
-    $Target = Split-Path -Path $installExe -Parent
+$dotnet = (Get-Command dotnet -ErrorAction Stop).Source
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+$staging = Join-Path $root "dist\$stamp"
+$updaterOutput = Join-Path $root "artifacts\updater-$stamp"
+& $dotnet publish (Join-Path $root 'MultiPresence\MultiPresence.csproj') -c Release -r win-x64 --self-contained false -o $staging --nologo
+if ($LASTEXITCODE -ne 0) { throw "MultiPresence publish failed: $LASTEXITCODE" }
+& $dotnet publish (Join-Path $root 'Updater\Updater.csproj') -c Release -r win-x64 --self-contained false -o $updaterOutput --nologo
+if ($LASTEXITCODE -ne 0) { throw "Updater publish failed: $LASTEXITCODE" }
+Copy-Item -LiteralPath (Join-Path $updaterOutput 'Updater.exe') -Destination $staging
+foreach ($name in 'MultiPresence.exe','Updater.exe') {
+    if (-not (Test-Path -LiteralPath (Join-Path $staging $name))) { throw "Missing build output: $name" }
+}
+Assert-InstallationStopped
+
+# Only files in this fresh publish are deployed. Never copy a developer's config into an install.
+$payload = @(Get-ChildItem -LiteralPath $staging -File -Recurse | Where-Object Extension -ne '.pdb' | ForEach-Object {
+    $relative = [IO.Path]::GetRelativePath($staging, $_.FullName)
+    if ($relative -match '^\.\.' -or [IO.Path]::IsPathRooted($relative)) { throw 'Invalid publish path.' }
+    if ($relative -notmatch '^Assets[\\/]Config[\\/]') {
+        [pscustomobject]@{ Source = $_.FullName; Relative = $relative }
+    }
+})
+$configRoot = Join-Path $Target 'Assets\Config'
+$preserved = @(Get-ChildItem -LiteralPath $configRoot -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+    [pscustomobject]@{ Relative = [IO.Path]::GetRelativePath($Target, $_.FullName); Sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash }
+})
+foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'MultiPresence\Config') -Filter *.json -File) {
+    $relative = Join-Path 'Assets\Config' $file.Name
+    if (-not (Test-Path -LiteralPath (Join-Path $Target $relative))) {
+        $payload += [pscustomobject]@{ Source = $file.FullName; Relative = $relative }
+    }
 }
 
-if (-not (Test-Path -LiteralPath $Target -PathType Container)) {
-    throw "The target folder does not exist: $Target"
+$backup = Join-Path $Target "Backups\update-$stamp"
+[IO.Directory]::CreateDirectory($backup) | Out-Null
+$backedUp = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($relative in (@($payload.Relative) + @($preserved.Relative))) {
+    $path = Join-Path $Target $relative
+    if ((Test-Path -LiteralPath $path -PathType Leaf) -and $backedUp.Add($relative)) {
+        $copy = Join-Path $backup $relative
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($copy)) | Out-Null
+        Copy-Item -LiteralPath $path -Destination $copy
+        if ((Get-FileHash -LiteralPath $path).Hash -ne (Get-FileHash -LiteralPath $copy).Hash) {
+            throw "Backup verification failed: $relative"
+        }
+    }
 }
 
-if (Get-Process -Name 'MultiPresence' -ErrorAction SilentlyContinue) {
-    throw 'MultiPresence is still running. Close the tray icon first.'
+$written = [Collections.Generic.List[string]]::new()
+$verified = @()
+try {
+    Assert-InstallationStopped
+    foreach ($file in $payload) {
+        $destination = Join-Path $Target $file.Relative
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination)) | Out-Null
+        $hash = (Get-FileHash -LiteralPath $file.Source -Algorithm SHA256).Hash
+        $temporary = $destination + '.deploy-' + [guid]::NewGuid().ToString('N') + '.tmp'
+        try {
+            Copy-Item -LiteralPath $file.Source -Destination $temporary
+            if ($hash -ne (Get-FileHash -LiteralPath $temporary).Hash) { throw "Staging failed: $($file.Relative)" }
+            [IO.File]::Move($temporary, $destination, $true)
+            $written.Add($file.Relative)
+        } finally {
+            if (Test-Path -LiteralPath $temporary -PathType Leaf) { Remove-Item -LiteralPath $temporary -Force }
+        }
+        if ($hash -ne (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) {
+            throw "Deployment verification failed: $($file.Relative)"
+        }
+        $verified += [pscustomobject]@{ File = $file.Relative; Sha256 = $hash }
+    }
+    foreach ($file in $preserved) {
+        if ($file.Sha256 -ne (Get-FileHash -LiteralPath (Join-Path $Target $file.Relative)).Hash) {
+            throw "An existing configuration changed: $($file.Relative)"
+        }
+    }
+} catch {
+    $failure = $_
+    foreach ($relative in $written) {
+        $destination = Join-Path $Target $relative
+        if ($backedUp.Contains($relative)) {
+            Copy-Item -LiteralPath (Join-Path $backup $relative) -Destination $destination -Force
+        } elseif (Test-Path -LiteralPath $destination -PathType Leaf) {
+            Remove-Item -LiteralPath $destination -Force
+        }
+    }
+    throw $failure
 }
 
-$dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
-if (-not $dotnet) { $dotnet = 'C:\Program Files\dotnet\dotnet.exe' }
-if (-not (Test-Path $dotnet)) { throw 'The .NET SDK was not found. Install it with: winget install Microsoft.DotNet.SDK.9' }
-
-$staging = Join-Path $root 'dist'
-Write-Host '==> Building' -ForegroundColor Cyan
-& $dotnet publish (Join-Path $root 'MultiPresence\MultiPresence.csproj') `
-    -c Release -r win-x64 --self-contained false -o $staging
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
-
-$exe = Join-Path $staging 'MultiPresence.exe'
-if (-not (Test-Path -LiteralPath $exe)) { throw "The publish did not produce $exe" }
-
-Write-Host '==> Deploying to' $Target -ForegroundColor Cyan
-
-# Presence templates. Copy them one by one so a renamed config never drags the whole folder over.
-$srcConfig = Join-Path $staging 'Assets\Config'
-$dstConfig = Join-Path $Target 'Assets\config'
-New-Item -ItemType Directory -Force -Path $dstConfig | Out-Null
-$copied = 0
-foreach ($file in Get-ChildItem -LiteralPath $srcConfig -Filter *.json) {
-    Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $dstConfig $file.Name) -Force
-    $copied++
-}
-Write-Host "    $copied presence config(s) copied" -ForegroundColor DarkGray
-
-# Ship the original artwork and its source credits alongside the URL-based templates.
-$srcArtwork = Join-Path $staging 'Assets\Artwork'
-$dstArtwork = Join-Path $Target 'Assets\Artwork'
-New-Item -ItemType Directory -Force -Path $dstArtwork | Out-Null
-Get-ChildItem -LiteralPath $srcArtwork | Copy-Item -Destination $dstArtwork -Recurse -Force
-
-# The executable. MultiPresenceGame.exe, steam_api64.dll and blacklist.txt are signed release
-# files, so they are left untouched; MultiPresence.exe must be closed before this runs.
-$dstExe = Join-Path $Target 'MultiPresence.exe'
-Remove-Item -LiteralPath $dstExe -Force
-Copy-Item -LiteralPath $exe -Destination $dstExe -Force
-
-$expected = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
-$actual = (Get-FileHash -LiteralPath $dstExe -Algorithm SHA256).Hash
-if ($expected -ne $actual) { throw 'The deployed executable does not match the build.' }
-
-Write-Host '==> Done.' $dstExe 'deployed and hash verified.' -ForegroundColor Green
-Write-Host '    Bloodborne and Sekiro use SteamGridDB artwork URLs; local originals are in Assets\Artwork.' -ForegroundColor DarkGray
+$revision = (& git -C $root rev-parse HEAD)
+[ordered]@{ Revision = $revision; Target = $Target; Build = $staging; Files = $verified; PreservedConfiguration = $preserved } |
+    ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $backup 'deployment.json') -Encoding utf8
+Write-Host "Deployed and hash-verified $($verified.Count) files; preserved $($preserved.Count) configuration files."
+[pscustomobject]@{ Target = $Target; Build = $staging; Backup = $backup }

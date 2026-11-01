@@ -4,19 +4,18 @@ using MultiPresence.Infrastructure;
 using MultiPresence.Properties;
 using MultiPresence.Runtime;
 using System.Diagnostics;
-using System.Globalization;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text.Json;
 
 namespace MultiPresence;
 
 public partial class MainForm : Form
 {
-    private const string CurrentReleaseDate = "21.07.2026";
+    private const string CurrentReleaseDate = "01.11.2026";
     private static readonly HttpClient UpdateClient = CreateUpdateClient();
     private readonly System.Windows.Forms.Timer _detectionTimer = new() { Interval = 3000 };
     private readonly SemaphoreSlim _detectionGate = new(1, 1);
+    private readonly CancellationTokenSource _updateCancellation = new();
     private readonly BlacklistStore _blacklist = new(Path.Combine("Assets", "blacklist.txt"));
     private string? _activeGame;
     private bool _updatingMenu;
@@ -25,13 +24,15 @@ public partial class MainForm : Form
     public MainForm()
     {
         InitializeComponent();
+        cms.Items.Insert(cms.Items.IndexOf(btn_Config) + 1,
+            new ToolStripMenuItem("Discord - MultiPresence", null, OpenDiscordServer));
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
         cb_DisableNotifications.Checked = Settings.Default.Notifications;
         cb_LaunchWithWindows.Checked = Settings.Default.startup;
         cb_LaunchWithWindowsAdmin.Checked = Settings.Default.startupadmin;
         cb_DisableAutoUpdates.Checked = Settings.Default.autoupdate;
-        lb_Version.Text = $"MultiPresence {GetDisplayVersion()}";
+        lb_Version.Text = $"MultiPresence {CurrentReleaseDate} (dizzi1222)";
 
         _detectionTimer.Tick += DetectionTimerOnTick;
         PresenceRuntime.DetectionRequested += PresenceRuntimeOnDetectionRequested;
@@ -51,10 +52,13 @@ public partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _exiting = true;
+        _updateCancellation.Cancel();
         _detectionTimer.Stop();
         _detectionTimer.Tick -= DetectionTimerOnTick;
         PresenceRuntime.DetectionRequested -= PresenceRuntimeOnDetectionRequested;
         PresenceRuntime.StopAll();
+        SteamPresenceLauncher.Stop(waitForExit: true);
         Hypervisor.DetachProcess();
         notify.Visible = false;
         base.OnFormClosed(e);
@@ -64,7 +68,7 @@ public partial class MainForm : Form
 
     private async Task DetectAndStartAsync()
     {
-        if (!await _detectionGate.WaitAsync(0).ConfigureAwait(true))
+        if (_exiting || IsDisposed || !await _detectionGate.WaitAsync(0).ConfigureAwait(true))
         {
             return;
         }
@@ -93,7 +97,6 @@ public partial class MainForm : Form
                 return;
             }
 
-            DeleteStaleSteamAppId();
             PlaceholderHelper._startTimestamp = Timestamps.Now;
             ShowTrackingNotification(detected.GameName);
             AppLog.Information("Starting game integration.", detected);
@@ -101,7 +104,7 @@ public partial class MainForm : Form
 
             // Steam integrations complete only when the game exits. Memory integrations request
             // detection through PresenceRuntime when their controlled polling loop finishes.
-            if (!PresenceRuntime.HasActiveLoops)
+            if (!_exiting && !IsDisposed && !PresenceRuntime.HasActiveLoops)
             {
                 _detectionTimer.Start();
             }
@@ -109,8 +112,11 @@ public partial class MainForm : Form
         catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {
             AppLog.Error("Starting a game integration failed.", exception, new { Game = _activeGame });
-            ShowErrorNotification("The game integration failed. See the log for details.");
-            _detectionTimer.Start();
+            if (!_exiting && !IsDisposed)
+            {
+                ShowErrorNotification("The game integration failed. See the log for details.");
+                _detectionTimer.Start();
+            }
         }
         finally
         {
@@ -162,6 +168,20 @@ public partial class MainForm : Form
         Close();
     }
 
+    private void OpenDiscordServer(object? sender, EventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://discord.gg/49vHb3qE65") { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            AppLog.Warning("Could not open the Discord server invite.", exception);
+            MessageBox.Show(this, "Open https://discord.gg/49vHb3qE65 to join the MultiPresence server.",
+                "MultiPresence", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
     private void btn_Config_Click(object? sender, EventArgs e)
     {
         try
@@ -203,6 +223,7 @@ public partial class MainForm : Form
             if (btn_Blacklist.Checked)
             {
                 PresenceRuntime.StopAll();
+                SteamPresenceLauncher.Stop();
             }
             else
             {
@@ -299,40 +320,86 @@ public partial class MainForm : Form
 
     private async Task CheckForUpdatesAsync()
     {
+        var installRequested = false;
+        var cancellationToken = _updateCancellation.Token;
         try
         {
             using var response = await UpdateClient.GetAsync(
-                "https://api.github.com/repos/Dekirai/MultiPresence/releases/latest").ConfigureAwait(true);
+                $"https://api.github.com/repos/{GitHubUpdater.Repository}/releases/latest", cancellationToken).ConfigureAwait(true);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // The fork can be built from source before it publishes its first release.
+                AppLog.Information("No published update is available for this fork.");
+                return;
+            }
             response.EnsureSuccessStatusCode();
-            await using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-            using var document = await JsonDocument.ParseAsync(stream).ConfigureAwait(true);
-            var root = document.RootElement;
-            var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v');
-            var url = root.GetProperty("html_url").GetString();
-
-            if (!TryParseReleaseDate(tag, out var latest) ||
-                !TryParseReleaseDate(CurrentReleaseDate, out var current) ||
-                latest <= current ||
-                !Uri.TryCreate(url, UriKind.Absolute, out var releaseUri))
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(true);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(true);
+            var release = GitHubUpdater.GetRelease(document.RootElement, CurrentReleaseDate);
+            if (release == null || _exiting || IsDisposed || cb_DisableAutoUpdates.Checked)
             {
                 return;
             }
 
+            if (await GitHubUpdater.IsInstalledAsync(release, Application.ExecutablePath, cancellationToken).ConfigureAwait(true))
+            {
+                AppLog.Information("The published MultiPresence update is already installed.", new { Version = release.Tag });
+                return;
+            }
+            if (_exiting || IsDisposed || cb_DisableAutoUpdates.Checked)
+            {
+                return;
+            }
+
+            AppLog.Information("A newer MultiPresence release is available.", new { CurrentVersion = CurrentReleaseDate, Version = release.Tag });
             var result = MessageBox.Show(
                 this,
-                $"MultiPresence {tag} is available. Open the release page?",
+                $"MultiPresence {release.Tag} is available. Download and install the update?",
                 "MultiPresence update",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Information);
             if (result == DialogResult.Yes)
             {
-                Process.Start(new ProcessStartInfo(releaseUri.AbsoluteUri) { UseShellExecute = true });
+                installRequested = true;
+                lb_Version.Text = $"Downloading MultiPresence {release.Tag}...";
+                using var downloadClient = CreateUpdateClient(TimeSpan.FromMinutes(5));
+                using var update = await GitHubUpdater.DownloadAsync(downloadClient, release, cancellationToken).ConfigureAwait(true);
+                if (_exiting || IsDisposed)
+                {
+                    return;
+                }
+
+                SaveSettings();
+                update.Launch(Application.ExecutablePath);
+                AppLog.Information("Update downloaded. Restarting through Updater.exe.", new { Version = release.Tag });
+                _exiting = true;
+                Close();
             }
         }
-        catch (Exception exception) when (
-            exception is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            AppLog.Warning("The update check failed.", exception);
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or
+                IOException or InvalidDataException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or KeyNotFoundException)
+        {
+            AppLog.Warning("The update could not be completed.", exception);
+            if (installRequested && !_exiting && !IsDisposed)
+            {
+                MessageBox.Show(this, "The update could not be downloaded or started. MultiPresence will keep running.\n\n" + exception.Message,
+                    "MultiPresence update", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            else if (exception is InvalidDataException && !_exiting && !IsDisposed)
+            {
+                ShowErrorNotification("The update release could not be used. " + exception.Message);
+            }
+        }
+        finally
+        {
+            if (!_exiting && !IsDisposed)
+            {
+                lb_Version.Text = $"MultiPresence {CurrentReleaseDate}";
+            }
         }
     }
 
@@ -370,36 +437,9 @@ public partial class MainForm : Form
         notify.ShowBalloonTip(5000);
     }
 
-    private static void DeleteStaleSteamAppId()
+    private static HttpClient CreateUpdateClient(TimeSpan? timeout = null)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "steam_appid.txt");
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (IOException exception)
-        {
-            AppLog.Warning("Could not remove the previous Steam application ID.", exception);
-        }
-    }
-
-    private static string GetDisplayVersion() =>
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? CurrentReleaseDate;
-
-    private static bool TryParseReleaseDate(string? value, out DateTime date) =>
-        DateTime.TryParseExact(
-            value,
-            "dd.MM.yyyy",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out date);
-
-    private static HttpClient CreateUpdateClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var client = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(10) };
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MultiPresence", "12.0"));
         return client;
     }
